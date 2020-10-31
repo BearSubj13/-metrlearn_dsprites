@@ -1,0 +1,16 @@
+{
+  "data":  {
+    "dataset_path": "dataset",
+    "dataset_file": "dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz"
+  },
+  "train": {
+    "batch_size": 256,
+    "device": "cuda:0",
+    "margin": 0.04,
+    "lr": 0.001,
+    "lr_decay": 1.2
+  },
+  "model": {
+    "latent_size": 12
+  }
+}

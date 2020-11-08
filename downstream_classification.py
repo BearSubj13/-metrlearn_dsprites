@@ -1,4 +1,4 @@
-from models import AutoEncoder, SimpleNet
+from models import AutoEncoder, SimpleNet, ComplexNet
 import torch
 import torch.nn as nn
 import json
@@ -12,24 +12,30 @@ dataset_path = os.path.join(conf['data']['dataset_path'], conf['data']['dataset_
 
 device = conf['train']['device']
 
+dataset_path = os.path.join(conf['data']['dataset_path'], conf['data']['dataset_file'])
 dspites_dataset = Dspites(dataset_path)
 train_val = train_val_split(dspites_dataset)
 val_test = train_val_split(train_val['val'], val_split=0.2)
 
 data_loader_train = DataLoader(train_val['train'], batch_size=conf['train']['batch_size'], shuffle=True, num_workers=2)
 data_loader_val = DataLoader(val_test['val'], batch_size=200, shuffle=False, num_workers=1)
+data_loader_test = DataLoader(val_test['train'], batch_size=200, shuffle=False, num_workers=1)
 
+conf['train']['batch_size'] = 128
 print('latent space size:', conf['model']['latent_size'])
 print('batch size:', conf['train']['batch_size'])
 
 data_loader_train = DataLoader(train_val['train'], batch_size=conf['train']['batch_size'], shuffle=True, num_workers=2)
 data_loader_val = DataLoader(train_val['val'], batch_size=500, shuffle=False, num_workers=1)
+load_path = 'weights/autoencoder_bce_loss_latent12.pt'
 
 model = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
 model = model.to(device)
-model.load_state_dict(torch.load('weights/autoencoder_bce_loss_latent12.pt'))
+model.load_state_dict(torch.load(load_path))
 
-classifier = SimpleNet(conf['model']['latent_size'])
+#classifier = SimpleNet(conf['model']['latent_size'])
+classifier = ComplexNet(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
+print(dir(classifier))
 classifier.to(device)
 
 loss_function = nn.CrossEntropyLoss()
@@ -61,16 +67,17 @@ def classification_validation(classifier, model, data_loader):
 
 model.eval()
 loss_list = []
-for epoch in range(25):
+for epoch in range(40):
    loss_list = []
    classifier.train()
-   if epoch > 10:
+   if epoch > 20:
        for param in optimizer.param_groups:
-           param['lr'] = max(0.0001, param['lr'] / 1.3)
+           param['lr'] = max(0.0001, param['lr'] / 1.2)
            print('lr: ', param['lr'])
    for batch_i, batch in enumerate(data_loader_train):
-      label = batch['latent'][:,1]  #figure type
+      label = batch['latent'][:,0]  #figure type
       label = label.type(torch.LongTensor) - 1
+
       label = label.to(device)
       batch = batch['image'].unsqueeze(1)
       batch = batch.type(torch.FloatTensor)
@@ -92,3 +99,7 @@ for epoch in range(25):
    classifier.eval()
    precision = classification_validation(classifier, model, data_loader_val)
    print('loss: {0:2.3f}, validation precision:{1:1.3f}'.format(loss, precision))
+
+classifier.eval()
+precision = classification_validation(classifier, model, data_loader_test)
+print('test precision:{0:1.3f}'.format(precision))

@@ -19,18 +19,29 @@ device = conf['train']['device']
 dataset_path = os.path.join(conf['data']['dataset_path'], conf['data']['dataset_file'])
 dspites_dataset = Dspites(dataset_path)
 train_val = train_val_split(dspites_dataset)
+val_test = train_val_split(train_val['val'], val_split=0.2)
+
+data_loader_train = DataLoader(train_val['train'], batch_size=conf['train']['batch_size'], shuffle=True, num_workers=2)
+data_loader_val = DataLoader(val_test['val'], batch_size=200, shuffle=False, num_workers=1)
+data_loader_test = DataLoader(val_test['train'], batch_size=200, shuffle=False, num_workers=1)
+
+print('metric learning')
+print('train dataset length: ', len(train_val['train']))
+print('val dataset length: ', len(val_test['val']))
+print('test dataset length: ', len(val_test['train']))
 
 print('latent space size:', conf['model']['latent_size'])
 print('batch size:', conf['train']['batch_size'])
 print('margin:', conf['train']['margin'])
+
+load_path = 'weights/contrastive_learning_latent12.pt'
+save_path = 'weights/contrastive_learning_latent12.pt'
 
 model = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
 model = model.to(device)
 
 transform2 = [alb.GaussianBlur(p=1), alb.GaussNoise(var_limit=(0.0, 0.07), mean=0.1, p=1)]
 transform1 = [alb.GridDistortion(p=0.2, num_steps=10, distort_limit=1.0), alb.OpticalDistortion(p=1, distort_limit = (-0.1,0.1), shift_limit=(-0.1, 0.1))]
-data_loader_train = DataLoader(train_val['train'], batch_size=conf['train']['batch_size'], shuffle=True, num_workers=2)
-data_loader_val = DataLoader(train_val['val'], batch_size=100, shuffle=False, num_workers=1)
 
 loss_function = nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=conf['train']['lr'])
@@ -118,26 +129,43 @@ def recall_validation(model, data_loader_val, augment_transform_list1, augment_t
     return recall, recall10
 
 
-model.load_state_dict(torch.load('contrastive_learning2.pt'))
+def main():
+    model.train()
+    if load_path:
+        model.load_state_dict(torch.load(load_path))
 
-for epoch in range(7):
-   loss_list = []
-   for batch_i, batch in enumerate(data_loader_train):
-      # if batch_i == 1000:
-      #     break
-      batch = batch['image']
-      batch = batch.type(torch.FloatTensor)
-      batch = batch.to(device)
-      loss = triplet_step(model, batch, transform1, transform2)
-      loss_list.append(loss.item())
-      optimizer.zero_grad()
-      loss.backward()
-      optimizer.step()
-   print('epoch {0}, loss {1:2.4f}'.format(epoch, sum(loss_list) / len(loss_list) ))
-   recall, recall10 = recall_validation(model, data_loader_val, transform1, transform2)
-   print('recall@3: {0:2.4f}, recall 10%: {1:2.4f}'.format(recall, recall10))
+    for epoch in range(10):
+       for param in optimizer.param_groups:
+            param['lr'] = max(0.00001, param['lr'] / conf['train']['lr_decay'])
+            print('lr: ', param['lr'])
+       loss_list = []
 
-torch.save(model.state_dict(), 'contrastive_learning2.pt')
+       for batch_i, batch in enumerate(data_loader_train):
+          # if batch_i == 1000:
+          #     break
+          batch = batch['image']
+          batch = batch.type(torch.FloatTensor)
+          batch = batch.to(device)
+          loss = triplet_step(model, batch, transform1, transform2)
+          loss_list.append(loss.item())
+          optimizer.zero_grad()
+          loss.backward()
+          optimizer.step()
+
+       recall, recall10 = recall_validation(model, data_loader_val, transform1, transform2)
+       if epoch == 0:
+           min_validation_recall = recall
+       else:
+           min_validation_recall = min(min_validation_recall, recall)
+       if min_validation_recall == recall and save_path:
+           torch.save(model.state_dict(), save_path)
+       print('epoch {0}, loss {1:2.4f}'.format(epoch, sum(loss_list) / len(loss_list) ))
+       print('recall@3: {0:2.4f}, recall 10%: {1:2.4f}'.format(recall, recall10))
+
+    model.load_state_dict(torch.load(save_path))
+    recall, recall10 = recall_validation(model, data_loader_test, transform1, transform2)
+    print('test recall@3: {0:2.4f}, recall@3 10%: {1:2.4f}'.format(recall, recall10))
 
 
-
+if __name__ == "__main__":
+    main()

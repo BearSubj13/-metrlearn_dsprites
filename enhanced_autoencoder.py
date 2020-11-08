@@ -39,7 +39,7 @@ def autoencoder_step(model, original_batch, device, loss_function):
     z_decoded, decoded_decoded = model(decoded.detach())
     z_original, decoded_original = model(original)
     reconstruction_loss_original = loss_function(decoded_original, original)
-    reconstruction_loss_decoded = loss_function(decoded_decoded, decoded)
+    reconstruction_loss_decoded = loss_function(decoded_decoded, original)
     reconstruction_loss = reconstruction_loss_original + reconstruction_loss_decoded
     cos_margin = 0.7*torch.ones(z_decoded.shape[0]).to(device)
     embedding_loss = torch.max(cos_margin, F.cosine_similarity(z_decoded, z_original)).mean()

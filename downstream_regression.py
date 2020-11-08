@@ -29,7 +29,7 @@ data_loader_val = DataLoader(train_val['val'], batch_size=500, shuffle=False, nu
 
 model = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
 model = model.to(device)
-model.load_state_dict(torch.load('weights/autoencoder_mse_loss_latent_32.pt'))
+model.load_state_dict(torch.load('weights/autoencoder_bce_loss_latent12.pt'))
 
 #1 - scale, 2,3 - orientation (cos, sin), 4,5 - position
 latent_range = [4, 5]
@@ -68,6 +68,8 @@ def regression_validation(regressor, model, data_loader):
         precision_list.append(error)
     mean_precision = sum(precision_list) / len(precision_list)
     return mean_precision
+
+
 
 model.eval()
 loss_list = []

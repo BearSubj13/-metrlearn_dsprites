@@ -4,7 +4,8 @@ import torch.nn.functional as F
 
 class AutoEncoder(nn.Module):
     def __init__(self, in_channels, dec_channels, latent_size):
-        super(AutoEncoder, self).__init__()
+        #nn.Module.__init__(self)
+        super().__init__()
 
         self.in_channels = in_channels
         self.dec_channels = dec_channels
@@ -184,18 +185,19 @@ class SimpleNet(nn.Module):
     from a latent vector
     '''
     def __init__(self, latent_size, number_of_classes=3):
-        super(SimpleNet, self).__init__()
+        #nn.Module.__init__(self)
+        super().__init__()
         self.latent_size = latent_size
-        self.fc1 = nn.Linear(latent_size, latent_size)
-        self.bn_1 = nn.BatchNorm1d(latent_size)
-        self.fc2 = nn.Linear(latent_size, latent_size)
+        self.fc1 = nn.Linear(latent_size, 64)
+        self.bn_1 = nn.BatchNorm1d(64)
+        self.fc2 = nn.Linear(64, latent_size)
         self.bn_2 = nn.BatchNorm1d(latent_size)
         self.fc3 = nn.Linear(latent_size, int(latent_size/2))
         self.bn_3 = nn.BatchNorm1d(int(latent_size/2))
         self.fc4 = nn.Linear(int(latent_size/2), number_of_classes)
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.1, inplace=True)
 
-    def forward(self, x):
+    def classification(self, x):
         x = self.fc1(x)
         x = self.leaky_relu(x)
         x = self.bn_1(x)
@@ -210,4 +212,19 @@ class SimpleNet(nn.Module):
 
         x = self.fc4(x)
         return x
+
+    def forward(self, x):
+        x = self.classification(x)
+        return x
+
+
+class ComplexNet(AutoEncoder, SimpleNet):
+    def __init__(self, in_channels, dec_channels, latent_size, number_of_classes=3):
+        SimpleNet.__init__(self, latent_size=latent_size, number_of_classes=number_of_classes)
+        AutoEncoder.__init__(self, in_channels=in_channels, dec_channels=dec_channels, latent_size=latent_size)
+
+    def forward(self, x):
+        z = self.encode(x)
+        y = self.classification(z)
+        return y
 

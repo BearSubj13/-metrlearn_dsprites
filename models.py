@@ -179,9 +179,10 @@ class AutoEncoder(nn.Module):
         decoded = self.decode(z)
         return z, decoded
 
+
 class SimpleNet(nn.Module):
     '''
-    predicts whether a figure is a square, ellips or hard
+    predicts whether a figure is a square, ellips or heart
     from a latent vector
     '''
     def __init__(self, latent_size, number_of_classes=3):

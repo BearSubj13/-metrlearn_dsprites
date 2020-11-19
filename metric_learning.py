@@ -10,56 +10,16 @@ import albumentations as alb
 from metircs_losses import metric_Recall_top_K
 from utils import image_batch_transformation
 
-
-
 with open("config.json") as json_file:
-   conf = json.load(json_file)
-device = conf['train']['device']
-
-dataset_path = os.path.join(conf['data']['dataset_path'], conf['data']['dataset_file'])
-dspites_dataset = Dspites(dataset_path)
-train_val = train_val_split(dspites_dataset)
-val_test = train_val_split(train_val['val'], val_split=0.2)
-
-data_loader_train = DataLoader(train_val['train'], batch_size=conf['train']['batch_size'], shuffle=True, num_workers=2)
-data_loader_val = DataLoader(val_test['val'], batch_size=200, shuffle=False, num_workers=1)
-data_loader_test = DataLoader(val_test['train'], batch_size=200, shuffle=False, num_workers=1)
-
-print('metric learning')
-print('train dataset length: ', len(train_val['train']))
-print('val dataset length: ', len(val_test['val']))
-print('test dataset length: ', len(val_test['train']))
-
-print('latent space size:', conf['model']['latent_size'])
-print('batch size:', conf['train']['batch_size'])
-print('margin:', conf['train']['margin'])
+    conf = json.load(json_file)
 
 load_path = 'weights/contrastive_learning_latent12.pt'
 save_path = 'weights/contrastive_learning_latent12.pt'
 
-model = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
-model = model.to(device)
-
 transform2 = [alb.GaussianBlur(p=1), alb.GaussNoise(var_limit=(0.0, 0.07), mean=0.1, p=1)]
 transform1 = [alb.GridDistortion(p=0.2, num_steps=10, distort_limit=1.0), alb.OpticalDistortion(p=1, distort_limit = (-0.1,0.1), shift_limit=(-0.1, 0.1))]
 
-loss_function = nn.BCELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=conf['train']['lr'])
 triplet_loss = nn.TripletMarginLoss(margin=conf['train']['margin'], p=2)
-
-model.train()
-loss_list = []
-
-
-# def simCLR_step(batch, augment_transform_list1, augment_transform_list2):
-#     augment_transform1 = np.random.choice(augment_transform_list1)
-#     augment_transform2 = np.random.choice(augment_transform_list2)
-#     batch_1 = []
-#     batch_2 = []
-#     for k in range(batch.shape[0]):
-#         batch_1.append(augment_transform1(image=batch[k, :, :].numpy())['image'])
-#         batch_2.append(augment_transform2(image=batch[k, :, :].numpy())['image'])
-
 
 
 def triplet_step(model, batch, augment_transform_list1, augment_transform_list2):
@@ -112,12 +72,10 @@ def recall_validation_step(model, batch, augment_transform_list1, augment_transf
         recall_k = metric_Recall_top_K(batch_composed.squeeze(), y_label, K=3, metric='cosine')
         return recall_k
 
-def recall_validation(model, data_loader_val, augment_transform_list1, augment_transform_list2):
+def recall_validation(model, data_loader_val, augment_transform_list1, augment_transform_list2, device):
     recall_list = []
     recall_list10 = []
     for batch_i, batch in enumerate(data_loader_val):
-        # if batch_i == 100:
-        #     break
         batch = batch['image']
         batch = batch.type(torch.FloatTensor)
         batch = batch.to(device)
@@ -130,6 +88,37 @@ def recall_validation(model, data_loader_val, augment_transform_list1, augment_t
 
 
 def main():
+    loss_function = nn.BCELoss()
+
+    with open("config.json") as json_file:
+        conf = json.load(json_file)
+    device = conf['train']['device']
+
+    dataset_path = os.path.join(conf['data']['dataset_path'], conf['data']['dataset_file'])
+    dspites_dataset = Dspites(dataset_path)
+    train_val = train_val_split(dspites_dataset)
+    val_test = train_val_split(train_val['val'], val_split=0.2)
+
+    data_loader_train = DataLoader(train_val['train'], batch_size=conf['train']['batch_size'], shuffle=True,
+                                   num_workers=2)
+    data_loader_val = DataLoader(val_test['val'], batch_size=200, shuffle=False, num_workers=1)
+    data_loader_test = DataLoader(val_test['train'], batch_size=200, shuffle=False, num_workers=1)
+
+    print('metric learning')
+    print('train dataset length: ', len(train_val['train']))
+    print('val dataset length: ', len(val_test['val']))
+    print('test dataset length: ', len(val_test['train']))
+
+    print('latent space size:', conf['model']['latent_size'])
+    print('batch size:', conf['train']['batch_size'])
+    print('margin:', conf['train']['margin'])
+
+    loss_list = []
+    model = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
+    model = model.to(device)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=conf['train']['lr'])
+
     model.train()
     if load_path:
         model.load_state_dict(torch.load(load_path))
@@ -152,7 +141,7 @@ def main():
           loss.backward()
           optimizer.step()
 
-       recall, recall10 = recall_validation(model, data_loader_val, transform1, transform2)
+       recall, recall10 = recall_validation(model, data_loader_val, transform1, transform2, device)
        if epoch == 0:
            min_validation_recall = recall
        else:

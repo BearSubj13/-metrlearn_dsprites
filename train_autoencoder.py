@@ -7,12 +7,17 @@ from torch.utils.data import DataLoader
 from models import AutoEncoder
 from utils import image_batch_transformation
 import albumentations as alb
+import numpy as np
 
 
 if __name__ == "__main__":
     load_path = 'weights/autoencoder_contrastive_latent12.pt'
     save_path = 'weights/autoencoder_contrastive_latent12.pt'
     freeze_encoder = True
+
+    transform2 = [alb.GaussianBlur(p=1), alb.GaussNoise(var_limit=(0.0, 0.07), mean=0.1, p=1)]
+    transform1 = [alb.GridDistortion(p=0.2, num_steps=10, distort_limit=1.0),
+                  alb.OpticalDistortion(p=1, distort_limit=(-0.1, 0.1), shift_limit=(-0.1, 0.1))]
 
 
 def autoencoder_step(model, batch, device, loss_function):
@@ -78,6 +83,8 @@ def main():
        model.train()
 
        for batch_i, batch in enumerate(data_loader_train):
+          augment_transform = np.random.choice(augment_transform_list1)
+          batch1 = image_batch_transformation(batch, augment_transform)
           loss = autoencoder_step(model, batch, device, loss_function)
           loss_list.append(loss.item())
           optimizer.zero_grad()

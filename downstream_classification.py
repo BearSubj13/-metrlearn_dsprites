@@ -5,6 +5,7 @@ import json
 import os
 from torch.utils.data import DataLoader
 from data_load import Dspites, train_val_split
+import copy
 
 with open("config.json") as json_file:
     conf = json.load(json_file)
@@ -27,15 +28,15 @@ print('batch size:', conf['train']['batch_size'])
 
 data_loader_train = DataLoader(train_val['train'], batch_size=conf['train']['batch_size'], shuffle=True, num_workers=2)
 data_loader_val = DataLoader(train_val['val'], batch_size=500, shuffle=False, num_workers=1)
-load_path = 'weights/autoencoder_bce_loss_latent12.pt'
+load_path = 'weights/my_algorithm_2triplet_5.pt'
 
 model = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
 model = model.to(device)
 model.load_state_dict(torch.load(load_path))
 
-#classifier = SimpleNet(conf['model']['latent_size'])
-classifier = ComplexNet(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
-print(dir(classifier))
+classifier = SimpleNet(conf['model']['latent_size'])
+#classifier = ComplexNet(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
+#print(dir(classifier))
 classifier.to(device)
 
 loss_function = nn.CrossEntropyLoss()
@@ -67,10 +68,10 @@ def classification_validation(classifier, model, data_loader):
 
 model.eval()
 loss_list = []
-for epoch in range(40):
+for epoch in range(45):
    loss_list = []
    classifier.train()
-   if epoch > 20:
+   if epoch > 25:
        for param in optimizer.param_groups:
            param['lr'] = max(0.0001, param['lr'] / 1.2)
            print('lr: ', param['lr'])
@@ -98,8 +99,14 @@ for epoch in range(40):
    loss = sum(loss_list)/len(loss_list)
    classifier.eval()
    precision = classification_validation(classifier, model, data_loader_val)
+   if epoch == 0:
+       max_val_precision = precision
+   else:
+       max_val_precision = max(max_val_precision, precision)
+   if max_val_precision == precision:
+       best_model = copy.deepcopy(model)
    print('loss: {0:2.3f}, validation precision:{1:1.3f}'.format(loss, precision))
 
 classifier.eval()
-precision = classification_validation(classifier, model, data_loader_test)
+precision = classification_validation(classifier, best_model, data_loader_test)
 print('test precision:{0:1.3f}'.format(precision))

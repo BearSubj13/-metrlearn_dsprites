@@ -7,6 +7,7 @@ import os
 from torch.utils.data import DataLoader
 from data_load import Dspites, train_val_split
 import matplotlib.pyplot as plt
+from my_algorithm import image_locality
 
 
 def encode_decode_3images(model, image1, image2, image3):
@@ -19,7 +20,7 @@ def encode_decode_3images(model, image1, image2, image3):
    decoded2 = decoded2.cpu().detach().numpy()
    decoded3 = decoded[2][0].squeeze()
    decoded3 = decoded3.cpu().detach().numpy()
-   return decoded1, decoded2, decoded3
+   return z, decoded1, decoded2, decoded3
 
 
 device = 'cuda'
@@ -32,7 +33,7 @@ train_val = train_val_split(dspites_dataset)
 
 model = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
 model = model.to(device)
-load_path = 'weights/my_algorithm_2triplet_5.pt'
+load_path = 'weights/my_algorithm_2triplet_6.pt'
 #autoencoder
 model.load_state_dict(torch.load(load_path))
 
@@ -45,12 +46,22 @@ plt.imsave("images/original_image3.png", image3)
 
 
 model.eval()
-decoded1, decoded2, decoded3 = encode_decode_3images(model, image1, image2, image3)
+z, decoded1, decoded2, decoded3 = encode_decode_3images(model, image1, image2, image3)
 plt.figure()
 plt.imsave("images/decoded_image1.png", decoded1)
 plt.imsave("images/decoded_image2.png", decoded2)
 plt.imsave("images/decoded_image3.png", decoded3)
 
+perturbed_images = image_locality(z, model, radius=1.5)
+decoded1 = perturbed_images[0].squeeze()
+decoded1 = decoded1.cpu().detach().numpy()
+decoded2 = perturbed_images[1].squeeze()
+decoded2 = decoded2.cpu().detach().numpy()
+decoded3 = perturbed_images[2].squeeze()
+decoded3 = decoded3.cpu().detach().numpy()
+plt.imsave("images/perturbed_1.png", decoded1)
+plt.imsave("images/perturbed_2.png", decoded2)
+plt.imsave("images/perturbed_3.png", decoded3)
 
 # image_decoded = torch.FloatTensor([[decoded1], [decoded2], [decoded3]])
 # image_decoded = image_decoded.to(device)
@@ -58,13 +69,11 @@ plt.imsave("images/decoded_image3.png", decoded3)
 # print(z[0])
 # print(z2[0])
 
-model_alternetive = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
-model_alternetive = model.to(device)
-model_alternetive.load_state_dict(torch.load('weights/autoencoder_contrastive_latent12.pt'))
+# model_alternetive = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
+# model_alternetive = model.to(device)
+# model_alternetive.load_state_dict(torch.load('weights/autoencoder_contrastive_latent12.pt'))
 
-#image_decoded3 = model_alternetive.decode(z2)
-decoded2_1, decoded2_2, decoded2_3 = encode_decode_3images(model_alternetive, decoded1, decoded2, decoded3)
-
-plt.imsave("images/decoded_image_alternative1.png", decoded2_1)
-plt.imsave("images/decoded_image_alternative2.png", decoded2_2)
-plt.imsave("images/decoded_image_alternative3.png", decoded2_3)
+# decoded2_1, decoded2_2, decoded2_3 = encode_decode_3images(model_alternetive, decoded1, decoded2, decoded3)
+# plt.imsave("images/decoded_image_alternative1.png", decoded2_1)
+# plt.imsave("images/decoded_image_alternative2.png", decoded2_2)
+# plt.imsave("images/decoded_image_alternative3.png", decoded2_3)

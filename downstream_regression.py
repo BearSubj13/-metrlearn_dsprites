@@ -33,11 +33,11 @@ model = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['la
 model = model.to(device)
 #
 #autoencoder_bce_loss_latent12.pt
-model.load_state_dict(torch.load('weights/my_algorithm_2triplet_5.pt'))
+model.load_state_dict(torch.load('weights/archi_mega_super_long_metric_learn_6.pt'))
 
 #1 - scale (from 0.5 to 1.0), 2,3 - orientation (cos, sin), 4,5 - position (from 0 to 1)
-latent_range = [1]
-min_value = 0.5
+latent_range = [4,5]
+min_value = 0
 max_value = 1
 
 regressor = SimpleNet(latent_size=conf['model']['latent_size'], number_of_classes=len(latent_range))

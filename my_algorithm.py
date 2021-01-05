@@ -13,8 +13,8 @@ from train_autoencoder import autoencoder_validation
 from metric_learning import recall_validation, transform1, transform2, triplet_loss
 import copy
 
-load_path = 'weights/archi_mega_super_long_metric_learn_5.pt' #'weights/my_algorithm_2triplet.pt'
-save_path = 'weights/archi_mega_super_long_metric_learn_6.pt' #'weights/my_algorithm_2triplet_3.pt'
+load_path = 'weights/my_algorithm_2triplet_5.pt' #'weights/my_algorithm_2triplet.pt'
+save_path = 'weights/my_algorithm_2triplet_6.pt' #'weights/my_algorithm_2triplet_3.pt'
 
 with open("config.json") as json_file:
     conf = json.load(json_file)
@@ -81,16 +81,6 @@ def triplet_step(model, batch, negative, augment_transform_list1, augment_transf
 
     negative_z = model.encode(negative)
     penalty = triplet_loss(positive, anchor, negative_z) + triplet_loss(anchor, positive, negative_z)
-    #print(loss11)
-    #print(loss21)
-    #print(loss24)
-    #print(penalty)
-    #print(torch.norm(positive-anchor, dim=1))
-    #print(torch.norm(positive - negative_z, dim=1))
-    #print(torch.norm(positive - negative1, dim=1))
-    #print(1-torch.nn.functional.cosine_similarity(positive, negative_z).mean())
-    #print(1-torch.nn.functional.cosine_similarity(positive, anchor).mean())
-    #print(1-torch.nn.functional.cosine_similarity(positive, negative1).mean())
 
     loss = loss11 + loss12 + loss13 + loss14 + \
            loss21 + loss22 + loss23 + loss24 + penalty
@@ -139,9 +129,9 @@ def train_decoder(model, data_loader_train, data_loader_val, data_loader_test, d
     print('test result: ', test_results)
 
 #do not forget to change to model.train()
-def image_locality(z, model, margin=conf['train']['margin']):
-    eps = torch.randn_like(z)
-    eps[torch.abs(eps) < 0.4] = 0.4*torch.sign(eps[torch.abs(eps) < 0.4])
+def image_locality(z, model, margin=conf['train']['margin'], radius=1):
+    eps = radius*torch.randn_like(z)
+    eps[torch.abs(eps) < 0.5] = 0.5*torch.sign(eps[torch.abs(eps) < 0.5])
     # eps_norm = torch.norm(eps, dim=1)
     # print(eps_norm.shape, eps.shape[1])
     # eps_norm = eps_norm.repeat(eps.shape[1], 1).transpose(1,0)
@@ -151,7 +141,7 @@ def image_locality(z, model, margin=conf['train']['margin']):
     # index_out_of_delta = eps_norm < min_delta
     # eps_norm[index_out_of_delta] = min_delta
     # eps = eps * eps_norm
-    z = z #+ margin * eps
+    z = z + margin * eps
     z = nn.functional.normalize(z, p=2, dim=1)
     decoded = model.decode(z)
     return decoded
@@ -175,7 +165,7 @@ def contrastive_autoencoder(model, optimizer, data_loader_train, data_loader_val
         #random images in close vicinity of original
         z = z.detach()
         model.eval()
-        decoded = image_locality(z, model, margin=conf['train']['margin'])
+        decoded = image_locality(z, model, margin=conf['train']['margin'], radius=1.5)
         decoded = decoded.detach()
 
         #train encoder by contrastive learning
@@ -198,12 +188,12 @@ def contrastive_autoencoder(model, optimizer, data_loader_train, data_loader_val
     model.train()
     return validation_loss, mean_epoch_loss_encoder, mean_penalty, mean_epoch_loss_metric
 
-
+#
 def iterative_training(model, optimizer, data_loader_train, data_loader_val, device):
-    for epoch in range(60):
+    for epoch in range(50):
         if epoch > 15:
             for param in optimizer.param_groups:
-                param['lr'] = max(0.00005, param['lr'] / conf['train']['lr_decay'])
+                param['lr'] = max(0.0001, param['lr'] / conf['train']['lr_decay'])
                 print('lr: ', param['lr'])
         validation_loss, mean_epoch_loss_encoder, penalty, mean_epoch_loss_metric \
             = contrastive_autoencoder(model, optimizer, data_loader_train, data_loader_val, device)
@@ -217,6 +207,7 @@ def iterative_training(model, optimizer, data_loader_train, data_loader_val, dev
         mean_epoch_loss, validation_loss = \
             decoder_step(model, loss_function, optimizer, data_loader_train, data_loader_val, device)
         print('         autoencoder loss: {0:2.5f}, BCE val: {1:2.5f}'.format(mean_epoch_loss, validation_loss))
+
 
 if __name__ == "__main__":
     device = conf['train']['device']

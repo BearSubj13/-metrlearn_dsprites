@@ -28,7 +28,7 @@ print('batch size:', conf['train']['batch_size'])
 
 data_loader_train = DataLoader(train_val['train'], batch_size=conf['train']['batch_size'], shuffle=True, num_workers=2)
 data_loader_val = DataLoader(train_val['val'], batch_size=500, shuffle=False, num_workers=1)
-load_path = 'weights/my_algorithm_2triplet_5.pt'
+load_path = 'weights/grayscale/archi_mega_super_long_metric_learn_6.pt'#my_algorithm_2triplet_5.pt'
 
 model = AutoEncoder(in_channels=1, dec_channels=1, latent_size=conf['model']['latent_size'])
 model = model.to(device)
